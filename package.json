@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Contract Vault is a secure contract management and escrow payment platform designed for freelancers and small-scale clients, enabling fraud-free work agreements with digital signatures and automated payment release.",
   "main": "index.js",
+   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
