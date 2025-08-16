@@ -32,11 +32,9 @@ const contractSchema = new mongoose.Schema(
     // 2. Contract Content
     contractData: {
       projectDescription: { type: String, default: "" },
-      deliverables: { type: [String], default: [] },
-      paymentTerms: { type: String, default: "" },
+      paymentTerms: { type: [String], default: [] },
       startDate: { type: Date, default: null }, 
       endDate: { type: Date, default: null },   
-      timeline: { type: String, default: "" },
       totalAmount: { type: Number, default: null },
       currency: { type: String, default: "INR" }, // since using Razorpay
       additionalClauses: { type: [String], default: [] },
