@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
       minlength: 6,
-      select: false, 
+      select: false,
     },
 
     role: {
@@ -44,6 +44,20 @@ const userSchema = new mongoose.Schema(
       phoneNumber: { type: String, trim: true },
       address: { type: String, trim: true },
       country: { type: String, trim: true },
+    },
+
+    // ✅ Digital Signature for contracts
+    signature: {
+      imageURL: { type: String, default: null }, // uploaded signature image
+      hash: { type: String, default: null },     // cryptographic hash for tamper-proofing
+    },
+
+    // ✅ Freelancer payout details (dummy for demo escrow)
+    payoutDetails: {
+      accountHolderName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true },
+      ifscCode: { type: String, trim: true },
+      upiId: { type: String, trim: true }, // optional alternative
     },
 
     verificationToken: String,
