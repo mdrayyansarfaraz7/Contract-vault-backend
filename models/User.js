@@ -46,18 +46,16 @@ const userSchema = new mongoose.Schema(
       country: { type: String, trim: true },
     },
 
-    // ✅ Digital Signature for contracts
     signature: {
-      imageURL: { type: String, default: null }, // uploaded signature image
-      hash: { type: String, default: null },     // cryptographic hash for tamper-proofing
+      imageURL: { type: String, default: null },
+      hash: { type: String, default: null },     
     },
 
-    // ✅ Freelancer payout details (dummy for demo escrow)
     payoutDetails: {
       accountHolderName: { type: String, trim: true },
       accountNumber: { type: String, trim: true },
       ifscCode: { type: String, trim: true },
-      upiId: { type: String, trim: true }, // optional alternative
+      upiId: { type: String, trim: true }, 
     },
 
     verificationToken: String,
