@@ -3,12 +3,6 @@ import mongoose from "mongoose";
 
 const contractSchema = new mongoose.Schema(
   {
-    // 1. Basic Info
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -29,45 +23,21 @@ const contractSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // 2. Contract Content
+    AgencyName: {
+      type: String,
+    },
+
     contractData: {
       projectDescription: { type: String, default: "" },
-      paymentTerms: { type: [String], default: [] },
-      startDate: { type: Date, default: null }, 
-      endDate: { type: Date, default: null },   
+      startDate: { type: Date, default: null }, //day contract is accepted
+      task: { type: [String], default: [] },
+      DeadLine: { type: Date, default: null },
       totalAmount: { type: Number, default: null },
       currency: { type: String, default: "INR" }, // since using Razorpay
-      additionalClauses: { type: [String], default: [] },
     },
 
-    // Contract file (generated PDF, etc.)
     contractFileURL: { type: String, default: null },
 
-    // 3. Lifecycle
-    status: {
-      type: String,
-      enum: [
-        "draft",        // still being prepared
-        "sent",         // sent to client
-        "viewed",       // client viewed
-        "accepted",     // both parties signed
-        "declined",     // client refused
-        "funded",       // client deposited into escrow
-        "work-submitted",// freelancer submitted proof
-        "approved",     // client approved work
-        "released",     // payment released to freelancer
-        "disputed",     // dispute raised
-        "refunded",     // refunded to client
-      ],
-      default: "draft",
-    },
-
-    // 4. ML template tracking
-    templateId: { type: String, default: null },
-    version: { type: Number, default: 1 },
-    isFinal: { type: Boolean, default: false },
-
-    // 5. Signatures (snapshots from User at signing time)
     signatures: {
       freelancer: {
         signedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -90,10 +60,12 @@ const contractSchema = new mongoose.Schema(
       },
     },
 
+
+
     // 6. Escrow / Payment Tracking
     escrow: {
-      razorpayOrderId: { type: String, default: null }, // when order created
-      razorpayPaymentId: { type: String, default: null }, // when funded
+      razorpayOrderId: { type: String, default: null },
+      razorpayPaymentId: { type: String, default: null },
       amountFunded: { type: Number, default: 0 },
       currency: { type: String, default: "INR" },
       fundedAt: Date,
@@ -101,13 +73,29 @@ const contractSchema = new mongoose.Schema(
       refundedAt: Date,
     },
 
-    // 7. Tamper-proofing
-    contractHash: String, // hash of full PDF + metadata
+    
+    contractHash: String, 
     lastHashVerification: Date,
 
-    // 8. Expiration & deadlines
     expiresAt: Date,
     autoExpireDays: { type: Number, default: null },
+        
+    status: {
+      type: String,
+      enum: [
+        "draft",        // still being prepared
+        "sent",         // sent to client
+        "accepted",     // both parties signed
+        "declined",     // client refused
+        "funded",       // client deposited into escrow
+        "work-submitted",// freelancer submitted proof
+        "approved",     // client approved work
+        "released",     // payment released to freelancer
+        "disputed",     // dispute raised
+        "refunded",     // refunded to client
+      ],
+      default: "draft",
+    },
   },
   { timestamps: true }
 );

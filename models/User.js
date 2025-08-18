@@ -57,7 +57,10 @@ const userSchema = new mongoose.Schema(
       ifscCode: { type: String, trim: true },
       upiId: { type: String, trim: true }, 
     },
-
+    contracts:[{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Contract",
+    }],
     verificationToken: String,
     verificationTokenExpiry: Date,
     resetPasswordToken: String,
