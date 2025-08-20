@@ -1,23 +1,32 @@
-// models/Transaction.js
 import mongoose from "mongoose";
 
 const transactionSchema = new mongoose.Schema(
   {
+    // Which contract this transaction belongs to
     contract: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Contract",
       required: true,
     },
 
+    // Who paid the money (usually client)
     payer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
 
+    // Who will ultimately receive the money (usually freelancer/agency)
     payee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: true,
+    },
+
+    // What kind of transaction this is
+    type: {
+      type: String,
+      enum: ["escrow-funding", "payout", "refund"],
       required: true,
     },
 
@@ -28,23 +37,25 @@ const transactionSchema = new mongoose.Schema(
 
     currency: {
       type: String,
-      default: "USD",
+      default: "INR", // since you’re using Razorpay
     },
 
+    // Razorpay integration
     razorpayOrderId: String,
     razorpayPaymentId: String,
     razorpaySignature: String,
 
+    // Escrow tracking
     escrowAccountId: String, 
-
     status: {
       type: String,
-      enum: ["initiated", "in_escrow", "released", "refunded", "failed"],
+      enum: ["initiated", "pending", "in_escrow", "released", "refunded", "failed"],
       default: "initiated",
     },
 
-    releasedAt: Date,
-    refundedAt: Date,
+    fundedAt: Date,     // when client actually paid
+    releasedAt: Date,   // when freelancer got paid
+    refundedAt: Date,   // if refunded
 
     notes: String,
   },

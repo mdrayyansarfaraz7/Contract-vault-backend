@@ -13,7 +13,7 @@ const contractSchema = new mongoose.Schema(
     client: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // client might not have an account yet
+      default: null, 
     },
 
     clientEmail: {

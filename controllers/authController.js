@@ -4,16 +4,17 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken"
+import Contract from "../models/Contract.js";
 
 export const register = async (req, res) => {
   try {
     const { username, email, password, role, payoutDetails, companyName } = req.body;
 
-    // Check if user already exists
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: "Email already in use" });
 
     let payout = {};
+
     const payoutData = payoutDetails || {};
 
     payout = {
@@ -68,6 +69,13 @@ export const register = async (req, res) => {
       verificationToken,
       verificationTokenExpiry,
     });
+
+        if (role === "client") {
+      const contracts = await Contract.find({ clientEmail: email }).select("_id");
+      if (contracts.length > 0) {
+        user.contracts = contracts.map(c => c._id);
+      }
+    }
 
     await user.save();
 
