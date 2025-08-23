@@ -37,29 +37,24 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: "Client must provide a company name" });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Handle signature upload
+    const hashedPassword = await bcrypt.hash(password, 10);
     let signatureData = {};
     if (req.file && req.file.path) {
       signatureData.imageURL = req.file.path;
       signatureData.hash = crypto.createHash("sha256").update(req.file.path).digest("hex");
     }
 
-    // Role-specific profile
     let profile = {};
     if (role === "client") {
       profile.companyName = companyName;
     }
 
-    // Generate 6-digit email verification token
     const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationTokenExpiry = Date.now() + 1000 * 60 * 60; // 1 hour
+    const verificationTokenExpiry = Date.now() + 1000 * 60 * 60; 
 
     // Create user
     const user = new User({
-
       username,
       email,
       password: hashedPassword,
