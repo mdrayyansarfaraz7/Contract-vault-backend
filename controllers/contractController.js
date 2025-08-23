@@ -1,7 +1,10 @@
 import Contract from "../models/Contract.js";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
+import razorpay from "../utils/razorpay.js";
 import sendEmail from "../utils/sendEmail.js";
+import crypto from "crypto";
+import axios from "axios";
 
 export const createContract = async (req, res) => {
   try {
@@ -49,14 +52,36 @@ export const createContract = async (req, res) => {
     });
 
 
-    const dummyPDFLink = "https://morth.nic.in/sites/default/files/dd12-13_0.pdf";
-    savedContract.contractFileURL = dummyPDFLink;
+    // const dummyPDFLink = "https://morth.nic.in/sites/default/files/dd12-13_0.pdf";
+    const CtrData = {
+      contractId: savedContract._id,
+      userId: freelancer._id,
+      currentDate: new Date().toISOString().split('T')[0],
+      fullName_freelancer: freelancer.username,
+      fullName_client: clientUser ? clientUser.username : "",
+      agencyName: AgencyName,
+      clientEmail: clientEmail,
+      userEmail: freelancer.email,
+      signatureUser: freelancer.signature.imageURL,
+      signatureClient: "",
+      contractData: {
+        projectDescription: contractData.projectDescription,
+        startDate: "",
+        DeadLine: contractData.DeadLine,
+        task: contractData.task,
+        totalAmount: contractData.totalAmount,
+        currency: contractData.currency
+      }
+    }
+
+    console.log(CtrData);
+    const data = await axios.post('https://contractvault-sc-2.onrender.com/create-contract', CtrData);
+    savedContract.contractFileURL = data.data.url;
     savedContract.status = "sent";
     await savedContract.save();
 
     let emailHtml;
     if (clientUser) {
-      // Client already registered
       emailHtml = `
         <div style="font-family: Arial, sans-serif; color: #333; background:#f9f9f9; padding:20px; border-radius:10px;">
           <h2 style="color:#2e7d32;">📄 New Contract from ${freelancer.fullName}</h2>
@@ -64,7 +89,7 @@ export const createContract = async (req, res) => {
           <p>You have received a new contract to review and respond.</p>
           <p><strong>Project:</strong> ${contractData.projectDescription || "N/A"}<br/>
           <strong>Total Amount:</strong> ${contractData.totalAmount || "N/A"} ${contractData.currency}</p>
-          <p><a href="${dummyPDFLink}" target="_blank" style="color:#2e7d32; text-decoration:none; font-weight:bold;"> View Contract PDF</a></p>
+          <p><a href="${data.data.url}" target="_blank" style="color:#2e7d32; text-decoration:none; font-weight:bold;"> View Contract PDF</a></p>
           <a href="http://localhost:5000/login" 
              style="display:inline-block; padding:12px 20px; background:#2e7d32; color:white; border-radius:8px; text-decoration:none; font-weight:bold; margin-top:15px;">
              🔗 Login & Review Contract
@@ -110,31 +135,30 @@ export const createContract = async (req, res) => {
   }
 };
 
-export const acceptContractCreatOrderPayment=  async (req, res) => {
+export const acceptContractCreatOrderPayment = async (req, res) => {
   try {
     const { id } = req.params;
-    const clientId = req.user.id; 
+    const clientId = req.user.id;
     const contract = await Contract.findById(id);
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-    if (contract.status !== "sent") {
+    if (contract.status !== "sent")
+     {
       return res.status(400).json({ error: "Contract cannot be accepted in current state" });
     }
 
     const amountInPaise = contract.contractData.totalAmount * 100;
 
-    // Create Razorpay order
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency: contract.contractData.currency || "INR",
       receipt: `contract_${id}`,
     });
 
-    // Create transaction record
     const transaction = await Transaction.create({
       contract: id,
-      payer: clientId,                  // from token
-      payee: contract.createdBy,        // freelancer who made the contract
+      payer: clientId,                  
+      payee: contract.createdBy,        
       type: "escrow-funding",
       amount: contract.contractData.totalAmount,
       currency: contract.contractData.currency,
@@ -155,17 +179,32 @@ export const acceptContractCreatOrderPayment=  async (req, res) => {
   }
 }
 
-export const successfullPayment=async (req, res) => {
+export const successfullPayment = async (req, res) => {
   try {
     const { id } = req.params;
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
+    // Find contract
     const contract = await Contract.findById(id);
-    if (!contract) return res.status(404).json({ error: "Contract not found" });
+    if (!contract) {
+      return res.status(404).json({ error: "Contract not found" });
+    }
 
-    // Find matching transaction
-    const transaction = await Transaction.findOne({ contract: id, razorpayOrderId: razorpay_order_id });
-    if (!transaction) return res.status(404).json({ error: "Transaction not found" });
+    // Check transactions
+    const allTransactions = await Transaction.find({ contract: id });
+    console.log("👉 All transactions for this contract:", allTransactions);
+
+    const transaction = await Transaction.findOne({
+      contract: id,
+      razorpayOrderId: razorpay_order_id,
+    });
+
+    if (!transaction) {
+      console.log("❌ No transaction found with contract:", id, "and razorpayOrderId:", razorpay_order_id);
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    console.log("✅ Found transaction:", transaction._id, "status:", transaction.status);
 
     // Verify signature
     const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -175,17 +214,67 @@ export const successfullPayment=async (req, res) => {
       .digest("hex");
 
     if (expectedSignature !== razorpay_signature) {
+      console.log("❌ Signature mismatch!");
       return res.status(400).json({ error: "Invalid payment signature" });
     }
+    console.log("✅ Signature verified successfully");
 
-    //  Update transaction & contract
+    // Update transaction
     transaction.razorpayPaymentId = razorpay_payment_id;
     transaction.razorpaySignature = razorpay_signature;
     transaction.status = "in_escrow";
     transaction.fundedAt = new Date();
     await transaction.save();
 
-    contract.status = "accepted"; 
+    // If client not already set, attach and generate contract file
+    if (!contract.client) {
+      contract.client = req.user.id;
+
+      await User.findByIdAndUpdate(req.user.id, {
+        $push: { contracts: contract._id },
+      });
+    }
+
+      const clientDetails = await User.findById(req.user.id);
+      contract.autoExpireDays = 30;
+
+      const CtrData = {
+        contractId: contract._id,
+        userId: contract.freelancer,
+        currentDate: new Date().toISOString().split("T")[0],
+        fullName_freelancer: "",
+        fullName_client: "",
+        agencyName: "",
+        clientEmail: "",
+        userEmail: "",
+        signatureUser: "",
+        signatureClient: clientDetails?.signature?.imageURL || "",
+        contractData: {
+          projectDescription: contract.projectDescription,
+          startDate: new Date().toISOString().split("T")[0],
+          DeadLine: contract.DeadLine,
+          task: contract.task,
+          totalAmount: contract.totalAmount,
+          currency: contract.currency,
+        },
+      };
+
+      try {
+        const response = await axios.post(
+          "https://contractvault-sc-2.onrender.com/isAccepted",
+          CtrData
+        );
+
+        const contractUrl = response.data.url || response.data;
+        contract.contractFileURL = contractUrl;
+        console.log("Contract PDF URL updated:", contractUrl);
+      } catch (err) {
+        console.error("Failed to generate contract URL:", err.message);
+      }
+    
+
+    // Update contract escrow status
+    contract.status = "accepted";
     contract.escrow = {
       razorpayOrderId: razorpay_order_id,
       razorpayPaymentId: razorpay_payment_id,
@@ -193,19 +282,25 @@ export const successfullPayment=async (req, res) => {
       currency: transaction.currency,
       fundedAt: transaction.fundedAt,
     };
-    await contract.save();
 
-    return res.json({ message: "Payment successful, contract accepted", contract, transaction });
+    await contract.save();
+    console.log("✅ Contract updated:", contract._id, "status now:", contract.status);
+
+    return res.json({
+      message: "Payment successful, contract accepted",
+      contract,
+      transaction,
+    });
   } catch (err) {
-    console.error(err);
+    console.error("💥 Server error in successfullPayment:", err);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-export const rejectContract= async (req, res) => {
+export const rejectContract = async (req, res) => {
   try {
     const { id } = req.params;
-    const clientId = req.user._id; // from your auth middleware
+    const clientId = req.user.id; // from your auth middleware
 
     const contract = await Contract.findById(id);
     if (!contract) return res.status(404).json({ error: "Contract not found" });
