@@ -53,9 +53,9 @@ const transactionSchema = new mongoose.Schema(
       default: "initiated",
     },
 
-    fundedAt: Date,     // when client actually paid
-    releasedAt: Date,   // when freelancer got paid
-    refundedAt: Date,   // if refunded
+    fundedAt: Date,    
+    releasedAt: Date,   
+    refundedAt: Date,   
 
     notes: String,
   },

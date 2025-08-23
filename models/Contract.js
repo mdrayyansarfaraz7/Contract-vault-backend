@@ -13,7 +13,7 @@ const contractSchema = new mongoose.Schema(
     client: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, 
+      default: null,
     },
 
     clientEmail: {
@@ -73,13 +73,13 @@ const contractSchema = new mongoose.Schema(
       refundedAt: Date,
     },
 
-    
-    contractHash: String, 
+
+    contractHash: String,
     lastHashVerification: Date,
 
     expiresAt: Date,
     autoExpireDays: { type: Number, default: null },
-        
+
     status: {
       type: String,
       enum: [
@@ -96,6 +96,19 @@ const contractSchema = new mongoose.Schema(
       ],
       default: "draft",
     },
+
+workProof: {
+    links: [{ type: String }],
+    attachments: [
+      {
+        url: String,
+        fileType: String,
+        public_id: String,
+        uploadedAt: { type: Date, default: Date.now },
+        submittedAt: { type: Date, default: Date.now }
+      }
+    ]
+  }
   },
   { timestamps: true }
 );

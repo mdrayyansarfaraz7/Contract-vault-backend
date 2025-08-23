@@ -8,7 +8,7 @@ import Contract from "../models/Contract.js";
 
 export const register = async (req, res) => {
   try {
-    const { username, email, password, role, payoutDetails, companyName } = req.body;
+    const { username,fullName, email, password, role, payoutDetails, companyName } = req.body;
 
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: "Email already in use" });
@@ -59,10 +59,14 @@ export const register = async (req, res) => {
 
     // Create user
     const user = new User({
+
       username,
       email,
       password: hashedPassword,
       role,
+      profile:{
+        fullName,
+      },
       signature: signatureData,
       profile,
       payoutDetails: payout,
