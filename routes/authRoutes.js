@@ -8,7 +8,9 @@ import {
   forgotPassword,
   resetPassword,
   sendVerificationCode,
+  getMe,
 } from "../controllers/authController.js";
+import verifyToken from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
@@ -21,8 +23,9 @@ router.post("/login", login);
 // Logout route
 router.post("/logout", logout);
 
-// Verify email route (usually with a token in query params)
-router.get("/verify-email", verifyEmail);
+router.get("/me", verifyToken, getMe);
+
+router.post("/verify-email", verifyEmail);
 
 // Forgot password route
 router.post("/forgot-password", forgotPassword);

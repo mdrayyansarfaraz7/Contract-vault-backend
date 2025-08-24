@@ -132,7 +132,7 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).select("+password");
+    const user = await User.findOne({ email }).select("+password").populate('contracts');
 
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
@@ -150,7 +150,7 @@ export const login = async (req, res) => {
     );
 
     res.cookie("token", token, { httpOnly: true, secure: false }); // set secure: true in prod
-    res.json({ message: "Login successful", token });
+    res.json({ message: "Login successful", token ,  user});
   } catch (err) {
     res.status(500).json({ message: "Server error" });
   }
@@ -310,3 +310,15 @@ export const sendVerificationCode = async (req, res) => {
   }
 };
 
+export const getMe = async (req, res) => {
+  try {
+    
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+    res.status(200).json({ user: req.user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+}; 

@@ -6,25 +6,49 @@ import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
 import axios from "axios";
 
+export const sendContract = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(id);
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+    console.log(contract);
+    res.status(200).json({ contract });
+  } catch (error) {
+    console.error('Error fetching contract:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 export const createContract = async (req, res) => {
   try {
-    const { clientEmail, AgencyName, contractData } = req.body;
+    console.log("🔍 Incoming request to create contract:");
+    console.log("➡️ req.body:", req.body);
+    console.log("➡️ req.user:", req.user);
 
+    const { clientEmail, AgencyName, contractData } = req.body;
     const freelancerId = req.user?.id;
+
     if (!freelancerId) {
+      console.warn("⛔ Unauthorized: No freelancer ID found in req.user");
       return res.status(401).json({ message: "Unauthorized: Freelancer not found" });
     }
 
     const freelancer = await User.findById(freelancerId);
     if (!freelancer) {
+      console.warn("⛔ Freelancer not found in DB:", freelancerId);
       return res.status(404).json({ message: "Freelancer not found" });
     }
 
     if (freelancer.role !== "freelancer") {
+      console.warn("⛔ User is not a freelancer:", freelancer.role);
       return res.status(403).json({ message: "Only freelancers can create contracts." });
     }
 
     const clientUser = await User.findOne({ email: clientEmail });
+    console.log("👥 Client user:", clientUser ? clientUser._id : "Not registered");
 
     const newContract = new Contract({
       createdBy: freelancer._id,
@@ -46,20 +70,19 @@ export const createContract = async (req, res) => {
     });
 
     const savedContract = await newContract.save();
+    console.log("✅ Contract saved in DB:", savedContract._id);
 
     await User.findByIdAndUpdate(freelancer._id, {
       $push: { contracts: savedContract._id },
     });
-
-
-    // const dummyPDFLink = "https://morth.nic.in/sites/default/files/dd12-13_0.pdf";
+    console.log(" Contract linked to freelancer:", freelancer._id);
 
     const CtrData = {
       contractId: savedContract._id,
       userId: freelancer._id,
       currentDate: new Date().toISOString().split('T')[0],
-      fullName_freelancer: freelancer.profile.fullName,
-      fullName_client: clientUser ? clientUser.profile.fullName : "",
+     fullName_freelancer: freelancer?.fullName || freelancer?.username || freelancer?._id || " ",
+     fullName_client: clientUser?.profile?.fullName || AgencyName || clientUser?._id || " ",
       agencyName: AgencyName,
       clientEmail: clientEmail,
       userEmail: freelancer.email,
@@ -73,18 +96,24 @@ export const createContract = async (req, res) => {
         totalAmount: contractData.totalAmount,
         currency: contractData.currency
       }
-    }
+    };
 
-    console.log(CtrData);
-    const data = await axios.post('https://contractvault-sc-2.onrender.com/create-contract', CtrData);
+    console.log("📄 Payload for PDF generation:", CtrData);
+
+    const data = await axios.post(
+      'https://contractvault-sc-2.onrender.com/create-contract',
+      CtrData
+    );
+
+    console.log("✅ PDF generated. URL:", data.data.url);
+
     savedContract.contractFileURL = data.data.url;
     savedContract.status = "sent";
     await savedContract.save();
 
     let emailHtml;
     if (clientUser) {
-      emailHtml = `
-        <div style="font-family: Arial, sans-serif; color: #333; background:#f9f9f9; padding:20px; border-radius:10px;">
+      emailHtml = `<div style="font-family: Arial, sans-serif; color: #333; background:#f9f9f9; padding:20px; border-radius:10px;">
           <h2 style="color:#2e7d32;"> New Contract from ${freelancer.fullName}</h2>
           <p>Hello ${clientUser.fullName},</p>
           <p>You have received a new contract to review and respond.</p>
@@ -96,33 +125,33 @@ export const createContract = async (req, res) => {
              Login & Review Contract
           </a>
           <p style="margin-top:30px;">Best regards,<br/>Contract Vault Team</p>
-        </div>
-      `;
+        </div>`; 
     } else {
-      emailHtml = `
-        <div style="font-family: Arial, sans-serif; color: #333; background:#f9f9f9; padding:20px; border-radius:10px;">
-          <h2 style="color:#2e7d32;">📄 New Contract Invitation from ${freelancer.username}</h2>
+      emailHtml = `<div style="font-family: Arial, sans-serif; color: #333; background:#f9f9f9; padding:20px; border-radius:10px;">
+          <h2 style="color:#2e7d32;"> New Contract Invitation from ${freelancer.username}</h2>
           <p>Hello,</p>
           <p>You have been invited to review and sign a contract.</p>
           <p><strong>Project:</strong> ${contractData.projectDescription || "N/A"}<br/>
           <strong>Total Amount:</strong> ${contractData.totalAmount || "N/A"} ${contractData.currency}</p>
-          <p><a href="${dummyPDFLink}" target="_blank" style="color:#2e7d32; text-decoration:none; font-weight:bold;">📄 View Contract PDF</a></p>
+          <p><a href="${data.data.url}" target="_blank" style="color:#2e7d32; text-decoration:none; font-weight:bold;">📄 View Contract PDF</a></p>
           <a href="http://localhost:5000/register" 
              style="display:inline-block; padding:12px 20px; background:#2e7d32; color:white; border-radius:8px; text-decoration:none; font-weight:bold; margin-top:15px;">
              Register & Accept Contract
           </a>
           <p style="margin-top:30px;">Best regards,<br/>Contract Vault Team</p>
-        </div>
-      `;
+        </div>`; // unchanged
     }
 
     const emailSubject = "New Contract for Review";
+    console.log(`📧 Sending email to ${clientEmail}`);
     await sendEmail(clientEmail, emailSubject, emailHtml);
+    console.log("✅ Email sent successfully");
 
     if (clientUser) {
       await User.findByIdAndUpdate(clientUser._id, {
         $push: { contracts: savedContract._id },
       });
+      console.log("📎 Contract linked to client:", clientUser._id);
     }
 
     res.status(201).json({
@@ -130,10 +159,11 @@ export const createContract = async (req, res) => {
       contract: savedContract,
     });
   } catch (error) {
-    console.error("Error creating contract:", error);
+    console.error("❌ Error creating contract:", error);
     res.status(500).json({ message: "Internal Server Error", error: error.message });
   }
 };
+
 
 export const acceptContractCreatOrderPayment = async (req, res) => {
   try {
@@ -275,6 +305,7 @@ export const successfullPayment = async (req, res) => {
       currency: transaction.currency,
       fundedAt: transaction.fundedAt,
     };
+    contract.status='funded';
 
     await contract.save();
 
@@ -316,9 +347,10 @@ export const rejectContract = async (req, res) => {
 };
 
 export const submitWorkProof = async (req, res) => {
- try {
+  try {
     const { id } = req.params;
-    const { links } = req.body;
+    const rawLinks = req.body.links;
+    console.log("Raw Links received:", rawLinks);
 
     const contract = await Contract.findById(id);
     if (!contract) {
@@ -326,25 +358,26 @@ export const submitWorkProof = async (req, res) => {
     }
 
     let parsedLinks = [];
-    if (links) {
-      if (Array.isArray(links)) {
-        parsedLinks = links;
-      } else {
-        parsedLinks = [links];
-      }
+    if (rawLinks) {
+      parsedLinks = Array.isArray(rawLinks) ? rawLinks : [rawLinks];
     }
+
     let attachments = [];
-    if (req.files && req.files.length > 0) {
-      attachments = req.files.map(file => ({
-        url: file.path,          
-        public_id: file.filename, 
+    if (req.files && req.files.attachments) {
+      attachments = req.files.attachments.map(file => ({
+        url: file.path,
+        public_id: file.filename,
         uploadedAt: new Date(),
         submittedAt: new Date(),
       }));
     }
+
     contract.workProof.links.push(...parsedLinks);
-    contract.workProof.attachments.push(...attachments);
+    contract.workProof.attachments=attachments;
+    contract.status='work-submitted';
     await contract.save();
+
+    console.log(contract.workProof);
 
     res.status(200).json({
       message: "Work submitted successfully",
@@ -360,7 +393,7 @@ export const approveContract = async (req, res) => {
   try {
     const { id } = req.params;
     const contract = await Contract.findById(id).populate("client createdBy");
-
+    console.log(contract);
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
